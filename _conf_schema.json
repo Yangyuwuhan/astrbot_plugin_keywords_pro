@@ -1,0 +1,26 @@
+{
+    "need_wake": {
+        "description": "使用指令时是否需要唤醒机器人",
+        "type": "bool",
+        "default": true,
+        "hint": "如果设置为true，只有在@机器人或使用唤醒词后才会触发关键词回复"
+    },
+    "whitelist": {
+        "description": "白名单",
+        "type": "list",
+        "default": [],
+        "hint": "白名单存在时，只有白名单内且在黑名单外的会话可使用。群聊采用 @群号 的形式，私聊采用 #QQ号 的形式"
+    },
+    "blacklist": {
+        "description": "黑名单",
+        "type": "list",
+        "default": [],
+        "hint": "白名单为空时，只有黑名单里的会话不可使用。群聊采用 @群号 的形式，私聊采用 #QQ号 的形式"
+    },
+    "max_calls_per_minute": {
+        "description": "1分钟内最多被累计调用的次数",
+        "type": "int",
+        "default": 30,
+        "hint": "防止插件被过度调用"
+    }
+}
