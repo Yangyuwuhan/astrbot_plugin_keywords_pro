@@ -1,0 +1,2 @@
+# astrbot_plugin_keywords_pro
+为Asrtbot设计的多功能关键词回复插件。
