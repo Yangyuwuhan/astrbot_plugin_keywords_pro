@@ -59,7 +59,11 @@ class KeywordsProPlugin(Star):
             default_data = {
                 "示例关键词": {
                     "aliases": ["例子", "示例"],
-                    "responses": [{"type": "text", "content": "这是一个示例回复"}],
+                    "responses": [
+                        {"text": "这是一个示例回复", "image": "", "video": ""},
+                        {"text": "示例多张图片", "image": ["", ""], "video": ""},
+                        {"text": "示例多个视频", "image": "", "video": ["", ""]},
+                    ],
                 }
             }
             logger.info(f"关键词文件不存在，创建默认关键词数据: {self.keywords_file}")
@@ -117,30 +121,54 @@ class KeywordsProPlugin(Star):
         from astrbot.api.message_components import BaseMessageComponent
 
         chain: list[BaseMessageComponent] = []
-        if response["type"] == "text":
-            chain.append(Comp.Plain(text=response["content"]))
-        elif response["type"] == "image":
-            # 图片路径处理
-            image_path = response["content"]
-            if not os.path.isabs(image_path):
-                image_path = os.path.join(self.data_dir, image_path)
-            chain.append(Comp.Image.fromFileSystem(image_path))
-        elif response["type"] == "video":
-            # 视频路径处理
-            video_path = response["content"]
-            if not os.path.isabs(video_path):
-                video_path = os.path.join(self.data_dir, video_path)
-            chain.append(Comp.Video(file=video_path))
-        elif response["type"] == "text_image":
-            # 文本+图片
-            if "text" in response:
-                chain.append(Comp.Plain(text=response["text"]))
-            if "image" in response:
-                image_path = response["image"]
+        # 处理文本
+        if "text" in response and response["text"]:
+            chain.append(Comp.Plain(text=response["text"]))
+        # 处理图片
+        if "image" in response:
+            # 检查是否为图片数组
+            images = response["image"]
+            if isinstance(images, list):
+                # 处理多张图片
+                for image_path in images:
+                    if image_path:
+                        if not os.path.isabs(image_path):
+                            image_path = os.path.join(self.data_dir, image_path)
+                        chain.append(Comp.Image.fromFileSystem(image_path))
+            elif images:
+                # 处理单张图片
+                image_path = images
                 if not os.path.isabs(image_path):
                     image_path = os.path.join(self.data_dir, image_path)
                 chain.append(Comp.Image.fromFileSystem(image_path))
         return chain
+
+    def _get_video_message(self, response):
+        """根据响应配置生成视频消息链"""
+        from astrbot.api.message_components import BaseMessageComponent
+
+        chains = []
+        # 处理视频
+        if "video" in response:
+            videos = response["video"]
+            if isinstance(videos, list):
+                # 处理多个视频
+                for video_path in videos:
+                    if video_path:
+                        chain: list[BaseMessageComponent] = []
+                        if not os.path.isabs(video_path):
+                            video_path = os.path.join(self.data_dir, video_path)
+                        chain.append(Comp.Video(file=video_path))
+                        chains.append(chain)
+            elif videos:
+                # 处理单个视频
+                chain: list[BaseMessageComponent] = []
+                video_path = videos
+                if not os.path.isabs(video_path):
+                    video_path = os.path.join(self.data_dir, video_path)
+                chain.append(Comp.Video(file=video_path))
+                chains.append(chain)
+        return chains
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
@@ -207,6 +235,12 @@ class KeywordsProPlugin(Star):
             message_chain = self._get_response_message(response)
             if message_chain:
                 yield event.chain_result(message_chain)
+
+            # 处理视频（单独发送）
+            video_chains = self._get_video_message(response)
+            for video_chain in video_chains:
+                if video_chain:
+                    yield event.chain_result(video_chain)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("keywords")
