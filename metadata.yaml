@@ -1,5 +1,5 @@
 name: astrbot_plugin_keywords_pro
-display_name: 关键词pro
+display_name: 关键词PRO
 author: Yangyuwuhan
 description: 关键词回复插件增强版，支持固定回复和随机回复模式，可设置关键词别名、群聊白名单和黑名单，实现精准的消息触发与过滤
 version: "2.1.1"
@@ -9,4 +9,5 @@ tags:
   - 消息过滤
   - 自动化
   - 群管理
+
 
