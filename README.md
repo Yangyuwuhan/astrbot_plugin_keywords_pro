@@ -92,7 +92,7 @@
 *b.在 test2 关键词中，用户会等概率地收到“这是一个多文件示例1+image1+image2”+“video1”+"video2" 和 “这是一个多文件示例2+image3+image4”+“video3”+"video4"*
 *c.图片和视频文件请放在 `AstrBot/data/keywords_data/`目录下*
 
-4.下面是一个最小化的配置实例:
+4. 下面是一个最小化的配置实例:
 
 ```json
 {
@@ -124,4 +124,5 @@
 ## 许可证
 
 AGPL-3.0 License
+
 
