@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关键词PRO 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        .response-item {
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+        }
+
+        .media-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .media-preview img,
+        .media-preview video {
+            max-width: 100%;
+            max-height: 150px;
+            object-fit: contain;
+        }
+
+        .media-item {
+            position: relative;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .media-item .remove-media {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: red;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .keyword-link {
+            cursor: pointer;
+            color: #0d6efd;
+            text-decoration: underline;
+        }
+
+        .keyword-link:hover {
+            color: #0a58ca;
+        }
+
+        .table-actions {
+            white-space: nowrap;
+        }
+
+        .uploading-spinner {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .file-input-hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="container mt-4" v-cloak>
+        <h1 class="mb-4">🔑 关键词PRO 管理</h1>
+
+        <!-- 顶部操作栏 -->
+        <div class="d-flex justify-content-between mb-3">
+            <button class="btn btn-success" @click="newKeyword">➕ 新增关键词</button>
+            <div>
+                <button class="btn btn-outline-danger me-2" @click="cleanupUnusedFiles" :disabled="loading">🗑️
+                    删除未使用的文件</button>
+                <button class="btn btn-outline-secondary" @click="refreshData" :disabled="loading">🔄 刷新</button>
+            </div>
+        </div>
+
+        <!-- 关键词列表表格 -->
+        <div v-if="loading" class="text-center">加载中...</div>
+        <div v-else>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>关键词</th>
+                        <th>别名</th>
+                        <th>创建时间</th>
+                        <th>回复数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(kwData, kw) in keywords" :key="kw">
+                        <td><span class="keyword-link" @click="editKeyword(kw)">{{ kw }}</span></td>
+                        <td>
+                            <span v-if="kwData.aliases && kwData.aliases.length">
+                                <span v-for="(alias, idx) in kwData.aliases" :key="idx" class="keyword-link me-1"
+                                    @click="editKeyword(kw)">
+                                    {{ alias }}<span v-if="idx < kwData.aliases.length-1">,</span>
+                                </span>
+                            </span>
+                            <span v-else class="text-muted">无</span>
+                        </td>
+                        <td>{{ formatTime(kwData.created_at) }}</td>
+                        <td>{{ kwData.responses ? kwData.responses.length : 0 }}</td>
+                        <td class="table-actions">
+                            <button class="btn btn-sm btn-outline-danger" @click="deleteKeyword(kw)">删除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 编辑关键词模态框 -->
+        <div class="modal fade" id="editModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editMode === 'add' ? '新增关键词' : '编辑关键词' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">关键词</label>
+                            <input type="text" class="form-control" v-model="editKey" :readonly="editMode==='edit'">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">别名（逗号分隔）</label>
+                            <input type="text" class="form-control" v-model="editAliases">
+                        </div>
+                        <hr>
+                        <h6>回复列表</h6>
+                        <div v-for="(resp, idx) in editResponses" :key="idx" class="response-item">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>回复 #{{ idx+1 }}</strong>
+                                <div>
+                                    <!-- 合并的上传文件按钮，位于移除按钮左侧 -->
+                                    <button class="btn btn-sm btn-outline-primary me-2" @click="triggerFileUpload(idx)"
+                                        :disabled="uploadingMap[idx]">
+                                        📁 上传文件
+                                        <span v-if="uploadingMap[idx]" class="uploading-spinner"></span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                        @click="removeResponse(idx)">移除</button>
+                                </div>
+                            </div>
+                            <!-- 隐藏的文件输入，用于上传 -->
+                            <input type="file" :id="'file-input-' + idx" class="file-input-hidden" multiple
+                                accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.mp4,.avi,.mov,.mkv,image/*,video/*"
+                                @change="handleFileSelected($event, idx)">
+
+                            <!-- 文本输入 -->
+                            <div class="mb-2">
+                                <label class="form-label">文本</label>
+                                <textarea class="form-control" rows="2" v-model="resp.text"></textarea>
+                            </div>
+
+                            <!-- 图片区域：仅在数组非空时显示 -->
+                            <div v-if="resp.image && resp.image.length > 0" class="mb-2">
+                                <label class="form-label">图片（JSON数组，可直接编辑）</label>
+                                <input type="text" class="form-control mb-1" :value="JSON.stringify(resp.image)"
+                                    @input="updateImageFromInput(resp, $event)">
+                                <!-- 图片预览 -->
+                                <div class="media-preview" v-if="resp.image.length > 0">
+                                    <div v-for="(img, imgIdx) in resp.image" :key="imgIdx" class="media-item">
+                                        <img :src="'/files/' + encodeURIComponent(img)" alt="图片"
+                                            style="max-width: 100px; max-height: 100px;">
+                                        <span class="remove-media" @click="removeMedia(resp, 'image', imgIdx)">×</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 视频区域：仅在数组非空时显示 -->
+                            <div v-if="resp.video && resp.video.length > 0" class="mb-2">
+                                <label class="form-label">视频（JSON数组，可直接编辑）</label>
+                                <input type="text" class="form-control mb-1" :value="JSON.stringify(resp.video)"
+                                    @input="updateVideoFromInput(resp, $event)">
+                                <!-- 视频预览（显示文件名） -->
+                                <div class="media-preview" v-if="resp.video.length > 0">
+                                    <div v-for="(vid, vidIdx) in resp.video" :key="vidIdx" class="media-item">
+                                        <span>{{ vid }}</span>
+                                        <span class="remove-media" @click="removeMedia(resp, 'video', vidIdx)">×</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-success" @click="addResponse">➕ 添加回复</button>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" @click="saveKeyword">保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const { createApp, ref, onMounted, reactive } = Vue;
+
+        const app = createApp({
+            setup() {
+                const loading = ref(false);
+                const keywords = ref({});
+                const editMode = ref('add');
+                const editKey = ref('');
+                const editAliases = ref('');
+                const editResponses = ref([]);
+                const uploadingMap = reactive({}); // 记录每个回复的上传状态
+
+                let bsEditModal = null;
+
+                // 标准化回复数据（确保 image/video 为数组）
+                function normalizeResponse(resp) {
+                    if (!resp) return { text: '', image: [], video: [] };
+                    const text = resp.text || '';
+                    let image = resp.image;
+                    if (image === undefined || image === null) image = [];
+                    else if (!Array.isArray(image)) image = image ? [image] : [];
+                    else image = image.map(i => i.trim()).filter(i => i !== '');
+                    let video = resp.video;
+                    if (video === undefined || video === null) video = [];
+                    else if (!Array.isArray(video)) video = video ? [video] : [];
+                    else video = video.map(v => v.trim()).filter(v => v !== '');
+                    return { text, image, video };
+                }
+
+                // 格式化时间
+                function formatTime(isoString) {
+                    if (!isoString) return '-';
+                    try {
+                        const date = new Date(isoString);
+                        if (isNaN(date.getTime())) return '-';
+                        return date.toLocaleString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                        }).replace(/\//g, '-');
+                    } catch {
+                        return '-';
+                    }
+                }
+
+                // 从 JSON 字符串更新图片数组
+                function updateImageFromInput(resp, event) {
+                    try {
+                        const val = JSON.parse(event.target.value);
+                        resp.image = Array.isArray(val) ? val : (val ? [val] : []);
+                    } catch {
+                        // 如果解析失败，保持原样
+                    }
+                }
+
+                // 从 JSON 字符串更新视频数组
+                function updateVideoFromInput(resp, event) {
+                    try {
+                        const val = JSON.parse(event.target.value);
+                        resp.video = Array.isArray(val) ? val : (val ? [val] : []);
+                    } catch {
+                        // 忽略
+                    }
+                }
+
+                // 删除单个媒体文件
+                function removeMedia(resp, type, index) {
+                    if (type === 'image') {
+                        resp.image.splice(index, 1);
+                    } else {
+                        resp.video.splice(index, 1);
+                    }
+                }
+
+                async function checkAuth() {
+                    try {
+                        const resp = await fetch('/auth/info');
+                        const data = await resp.json();
+                        if (data.requires_auth) {
+                            const testResp = await fetch('/api/keywords');
+                            if (testResp.status === 401) {
+                                window.location.href = '/login.html';
+                            }
+                        }
+                    } catch { }
+                }
+
+                async function loadKeywords() {
+                    loading.value = true;
+                    try {
+                        const resp = await fetch('/api/keywords');
+                        const data = await resp.json();
+                        if (data.success) {
+                            keywords.value = data.keywords;
+                        } else {
+                            alert('加载失败: ' + data.error);
+                        }
+                    } catch {
+                        alert('网络错误');
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                function refreshData() {
+                    loadKeywords();
+                }
+
+                function newKeyword() {
+                    editMode.value = 'add';
+                    editKey.value = '';
+                    editAliases.value = '';
+                    editResponses.value = [normalizeResponse()];
+                    bsEditModal.show();
+                }
+
+                function editKeyword(key) {
+                    editMode.value = 'edit';
+                    editKey.value = key;
+                    const data = keywords.value[key];
+                    editAliases.value = (data.aliases || []).join(', ');
+                    editResponses.value = (data.responses || []).map(normalizeResponse);
+                    if (editResponses.value.length === 0) {
+                        editResponses.value = [normalizeResponse()];
+                    }
+                    bsEditModal.show();
+                }
+
+                function addResponse() {
+                    editResponses.value.push(normalizeResponse());
+                }
+
+                function removeResponse(idx) {
+                    editResponses.value.splice(idx, 1);
+                }
+
+                async function saveKeyword() {
+                    const key = editKey.value.trim();
+                    if (!key) {
+                        alert('关键词不能为空');
+                        return;
+                    }
+                    const aliases = editAliases.value.split(',').map(s => s.trim()).filter(s => s);
+                    const responses = editResponses.value.map(r => ({
+                        text: r.text || '',
+                        image: r.image,
+                        video: r.video
+                    }));
+                    const data = { aliases, responses };
+                    try {
+                        let url = '/api/keywords';
+                        let method = 'POST';
+                        if (editMode.value === 'edit') {
+                            url = `/api/keywords/${encodeURIComponent(key)}`;
+                            method = 'PUT';
+                        }
+                        const resp = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key, data })
+                        });
+                        const result = await resp.json();
+                        if (result.success) {
+                            bsEditModal.hide();
+                            await loadKeywords();
+                        } else {
+                            alert('保存失败: ' + result.error);
+                        }
+                    } catch {
+                        alert('网络错误');
+                    }
+                }
+
+                async function deleteKeyword(key) {
+                    if (!confirm(`确定删除关键词 “${key}” 吗？`)) return;
+                    try {
+                        const resp = await fetch(`/api/keywords/${encodeURIComponent(key)}`, { method: 'DELETE' });
+                        const data = await resp.json();
+                        if (data.success) {
+                            await loadKeywords();
+                        } else {
+                            alert('删除失败: ' + data.error);
+                        }
+                    } catch {
+                        alert('网络错误');
+                    }
+                }
+
+                // 触发文件选择
+                function triggerFileUpload(idx) {
+                    const inputId = 'file-input-' + idx;
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                        input.click();
+                    }
+                }
+
+                // 处理文件上传，自动分类
+                async function handleFileSelected(event, idx) {
+                    const files = event.target.files;
+                    if (!files.length) return;
+
+                    uploadingMap[idx] = true;
+                    const resp = editResponses.value[idx];
+
+                    let completed = 0;
+                    const total = files.length;
+
+                    for (let file of files) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            if (data.success) {
+                                const ext = file.name.split('.').pop().toLowerCase();
+                                const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+                                const videoExts = ['mp4', 'avi', 'mov', 'mkv'];
+                                if (imageExts.includes(ext)) {
+                                    if (!resp.image.includes(data.filename)) {
+                                        resp.image.push(data.filename);
+                                    }
+                                } else if (videoExts.includes(ext)) {
+                                    if (!resp.video.includes(data.filename)) {
+                                        resp.video.push(data.filename);
+                                    }
+                                } else {
+                                    alert(`不支持的文件类型: ${ext}`);
+                                }
+                            } else {
+                                alert(`${file.name} 上传失败: ${data.error}`);
+                            }
+                        } catch {
+                            alert(`${file.name} 上传失败: 网络错误`);
+                        } finally {
+                            completed++;
+                            if (completed === total) {
+                                uploadingMap[idx] = false;
+                            }
+                        }
+                    }
+                    event.target.value = ''; // 清空，允许重新选择同一文件
+                }
+
+                // ---------- 新增：清理未使用文件 ----------
+                async function cleanupUnusedFiles() {
+                    if (!confirm("这将删除插件存储的所有没有被任何回复引用的文件。确定继续吗？")) {
+                        return;
+                    }
+                    loading.value = true;
+                    try {
+                        const resp = await fetch('/api/cleanup_unused_files', { method: 'POST' });
+                        const data = await resp.json();
+                        if (data.success) {
+                            alert(`清理完成，已删除 ${data.count} 个未使用文件。`);
+                        } else {
+                            alert('清理失败: ' + data.error);
+                        }
+                    } catch (err) {
+                        alert('网络错误');
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                onMounted(() => {
+                    bsEditModal = new bootstrap.Modal(document.getElementById('editModal'));
+                    checkAuth();
+                    loadKeywords();
+                });
+
+                return {
+                    loading,
+                    keywords,
+                    editMode,
+                    editKey,
+                    editAliases,
+                    editResponses,
+                    uploadingMap,
+                    refreshData,
+                    newKeyword,
+                    editKeyword,
+                    deleteKeyword,
+                    addResponse,
+                    removeResponse,
+                    saveKeyword,
+                    triggerFileUpload,
+                    handleFileSelected,
+                    formatTime,
+                    updateImageFromInput,
+                    updateVideoFromInput,
+                    removeMedia,
+                    cleanupUnusedFiles  // 新增
+                };
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

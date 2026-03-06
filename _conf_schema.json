@@ -32,7 +32,7 @@
     "webui_base_url": {
         "description": "WebUI 外部访问地址（用于视频文件URL）",
         "type": "string",
-        "default": "http://172.17.224.1:5678",
-        "hint": "如果 Napcat 运行在容器或另一台机器，需要填写能访问到本插件的地址，如 http://host.docker.internal:5678"
+        "default": "http://127.0.0.1:5678",
+        "hint": "⚠️ 如果 Napcat 运行在 WSL2/容器中，此处必须填写 Windows 主机的局域网 IP（如 http://192.168.1.100:5678），否则视频无法播放。"
     }
 }
