@@ -4,9 +4,3 @@ author: Yangyuwuhan
 description: 关键词回复插件增强版，支持固定回复和随机回复模式，可设置关键词别名、群聊白名单和黑名单，支持同时回复文字+图片+视频
 version: "2.2.1"
 repo: "https://github.com/Yangyuwuhan/astrbot_plugin_keywords_pro"
-tags:
-  - 关键词回复
-  - 消息过滤
-  - 自动化
-  - 群管理
-
