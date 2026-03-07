@@ -5,12 +5,13 @@ import os
 import time
 import uuid
 from pathlib import Path
-from urllib.parse import unquote
 
-from .utils import safe_path_resolve
 from aiohttp import web
 
 from astrbot.api import logger
+
+from . import utils
+from .utils import safe_path_resolve
 
 
 class WebServer:
@@ -139,7 +140,7 @@ class WebServer:
         self.app.router.add_get("/api/files", self.handle_list_files)
         self.app.router.add_post(
             "/api/cleanup_unused_files", self.handle_cleanup_unused_files
-        )  # 新增
+        )
         self.app.router.add_get("/auth/info", self.handle_auth_info)
         self.app.router.add_post("/auth/login", self.handle_auth_login)
         self.app.router.add_post("/auth/logout", self.handle_auth_logout)
@@ -172,11 +173,13 @@ class WebServer:
                 if key in self.plugin.keywords_data:
                     return self._err("关键词已存在", 409)
                 # 设置时间字段
-                now = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+                now = utils.current_time_iso()  # 注意导入utils
                 data["created_at"] = now
                 data["updated_at"] = now
                 self.plugin.keywords_data[key] = data
                 self.plugin._save_keywords(self.plugin.keywords_data)
+                # 触发定时任务重新调度
+                await self.plugin._reschedule_cron_jobs()
             return self._ok({"key": key})
         except Exception as e:
             logger.error(f"新增关键词失败: {e}")
@@ -188,23 +191,35 @@ class WebServer:
             return self._err("关键词无效", 400)
         try:
             payload = await request.json()
-            new_data = payload.get("data", {})
-            if not isinstance(new_data, dict):
+            new_key = payload.get("new_key", "").strip()  # 可能的新键名
+            data = payload.get("data", {})
+            if not isinstance(data, dict):
                 return self._err("数据格式错误", 400)
 
             async with self.plugin._keywords_lock:
                 if key not in self.plugin.keywords_data:
                     return self._err("关键词不存在", 404)
-                # 保留原有创建时间
-                new_data["created_at"] = self.plugin.keywords_data[key].get(
-                    "created_at"
-                )
-                # 更新修改时间
-                new_data["updated_at"] = time.strftime(
-                    "%Y-%m-%dT%H:%M:%S", time.localtime()
-                )
-                self.plugin.keywords_data[key] = new_data
+
+                # 如果提供了新key且与原key不同，执行重命名
+                if new_key and new_key != key:
+                    if new_key in self.plugin.keywords_data:
+                        return self._err("新关键词已存在", 409)
+                    # 复制数据并删除旧键
+                    self.plugin.keywords_data[new_key] = self.plugin.keywords_data[
+                        key
+                    ].copy()
+                    del self.plugin.keywords_data[key]
+                    key = new_key  # 后续使用新key更新数据
+
+                # 保留创建时间，更新修改时间
+                data["created_at"] = self.plugin.keywords_data[key].get("created_at")
+                data["updated_at"] = utils.current_time_iso()
+                self.plugin.keywords_data[key] = data
                 self.plugin._save_keywords(self.plugin.keywords_data)
+
+                # 触发定时任务重新调度
+                await self.plugin._reschedule_cron_jobs()
+
             return self._ok()
         except Exception as e:
             logger.error(f"更新关键词失败: {e}")
@@ -219,6 +234,8 @@ class WebServer:
                 return self._err("关键词不存在", 404)
             del self.plugin.keywords_data[key]
             self.plugin._save_keywords(self.plugin.keywords_data)
+            # 触发定时任务重新调度
+            await self.plugin._reschedule_cron_jobs()
         return self._ok()
 
     async def handle_upload_file(self, request):
@@ -279,40 +296,32 @@ class WebServer:
         file_path = safe_path_resolve(self.plugin.data_dir, filename)
         if not file_path or not file_path.is_file():
             raise web.HTTPNotFound()
-        if not file_path or not file_path.is_file():
-            logger.warning(f"文件不存在或路径非法: {filename}")
-            raise web.HTTPNotFound()
         logger.debug(f"提供文件: {file_path}")
         content_type, _ = mimetypes.guess_type(str(file_path))
         if not content_type:
             content_type = "application/octet-stream"
         return web.FileResponse(file_path, headers={"Content-Type": content_type})
 
-    # ---------- 新增：清理未使用文件 ----------
     async def handle_cleanup_unused_files(self, request):
         """删除未被任何关键词回复引用的文件"""
         try:
             plugin = self.plugin
             async with plugin._keywords_lock:
-                # 收集所有被引用的文件名
                 used_files = set()
                 for keyword, data in plugin.keywords_data.items():
                     responses = data.get("responses", [])
                     for resp in responses:
-                        # 图片
                         images = resp.get("image", [])
                         if isinstance(images, list):
                             used_files.update(images)
                         elif isinstance(images, str) and images:
                             used_files.add(images)
-                        # 视频
                         videos = resp.get("video", [])
                         if isinstance(videos, list):
                             used_files.update(videos)
                         elif isinstance(videos, str) and videos:
                             used_files.add(videos)
 
-                # 获取 data_dir 中所有文件（排除 keywords.json）
                 all_files = set()
                 exclude_files = {"keywords.json"}
                 for entry in os.listdir(plugin.data_dir):
@@ -322,7 +331,6 @@ class WebServer:
                     if os.path.isfile(file_path):
                         all_files.add(entry)
 
-                # 计算未使用文件
                 unused_files = all_files - used_files
                 deleted = []
                 for filename in unused_files:

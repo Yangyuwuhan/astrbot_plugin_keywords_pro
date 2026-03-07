@@ -1,10 +1,4 @@
 {
-    "need_wake": {
-        "description": "使用指令时是否需要唤醒机器人",
-        "type": "bool",
-        "default": true,
-        "hint": "如果设置为true，只有在@机器人或使用唤醒词后才会触发关键词回复"
-    },
     "whitelist": {
         "description": "白名单",
         "type": "list",

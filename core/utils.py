@@ -1,12 +1,11 @@
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Union
 
 from astrbot.api import logger
 
 
-def safe_path_resolve(base_dir: Union[str, Path], raw_path: str) -> Path | None:
+def safe_path_resolve(base_dir: str | Path, raw_path: str) -> Path | None:
     """
     安全解析路径，防止目录遍历攻击。
     返回解析后的Path对象，如果路径不安全或不存在则返回None。
@@ -32,7 +31,7 @@ def safe_path_resolve(base_dir: Union[str, Path], raw_path: str) -> Path | None:
     return abs_path if abs_path.exists() else None
 
 
-def file_exists(base_dir: Union[str, Path], filename: str) -> bool:
+def file_exists(base_dir: str | Path, filename: str) -> bool:
     if not filename:
         return False
     if ".." in filename or filename.startswith(("/", "\\")):

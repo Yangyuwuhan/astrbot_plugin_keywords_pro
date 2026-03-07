@@ -1,6 +1,6 @@
-from pathlib import Path
-from typing import Generator, List
 import urllib.parse
+from collections.abc import Generator
+from pathlib import Path
 
 import astrbot.api.message_components as Comp
 from astrbot.api import logger
@@ -11,7 +11,7 @@ class MessageSender:
         self.data_dir = data_dir
         self.webui_base_url = webui_base_url.rstrip("/")
 
-    def build_response_chains(self, response: dict) -> Generator[List, None, None]:
+    def build_response_chains(self, response: dict) -> Generator[list, None, None]:
         chain_text_image = []
 
         if response.get("text"):
