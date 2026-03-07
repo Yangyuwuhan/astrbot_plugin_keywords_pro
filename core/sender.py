@@ -1,5 +1,7 @@
+import random
 import urllib.parse
 from collections.abc import Generator
+from datetime import datetime
 from pathlib import Path
 
 import astrbot.api.message_components as Comp
@@ -11,11 +13,38 @@ class MessageSender:
         self.data_dir = data_dir
         self.webui_base_url = webui_base_url.rstrip("/")
 
+    def _replace_variables(self, text: str) -> str:
+        """替换文本中的变量"""
+        now = datetime.now()
+
+        # 星期几中文映射
+        weekdays = [
+            "星期一",
+            "星期二",
+            "星期三",
+            "星期四",
+            "星期五",
+            "星期六",
+            "星期日",
+        ]
+        day_of_week = weekdays[now.weekday()]
+
+        # 替换变量
+        text = text.replace("{time}", now.strftime("%H:%M:%S"))
+        text = text.replace("{date}", now.strftime("%Y-%m-%d"))
+        text = text.replace("{datetime}", now.strftime("%Y-%m-%d %H:%M:%S"))
+        text = text.replace("{random}", str(random.randint(1, 100)))
+        text = text.replace("{day_of_week}", day_of_week)
+
+        return text
+
     def build_response_chains(self, response: dict) -> Generator[list, None, None]:
         chain_text_image = []
 
         if response.get("text"):
-            chain_text_image.append(Comp.Plain(text=response["text"]))
+            # 替换文本中的变量
+            text = self._replace_variables(response["text"])
+            chain_text_image.append(Comp.Plain(text=text))
 
         for img in response.get("image", []):
             if img:

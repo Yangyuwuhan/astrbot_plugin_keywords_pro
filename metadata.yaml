@@ -5,4 +5,5 @@ description: 关键词回复插件增强版，支持固定回复和随机回复�
 version: "3.2.1"
 repo: "https://github.com/Yangyuwuhan/astrbot_plugin_keywords_pro"
 support_platforms:
+
   - aiocqhttp
