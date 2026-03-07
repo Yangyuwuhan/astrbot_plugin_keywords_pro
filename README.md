@@ -44,13 +44,7 @@ astrbot_plugin_keywords_pro/
 ├── main.py                   # 插件主入口
 ├── metadata.yaml             # 插件元数据
 └── requirements.txt          # 依赖项
-```
-
-* **core/**：包含插件的核心功能实现，包括WebUI、配置管理、消息发送等
-* **core/templates/**：WebUI的HTML模板文件
-* **main.py**：插件的主入口文件，处理消息和指令
-* **metadata.yaml**：插件的元数据信息
-* **requirements.txt**：插件依赖的Python包
+```
 
 ## 配置项
 
