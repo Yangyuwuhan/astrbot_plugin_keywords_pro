@@ -96,12 +96,59 @@
         .file-input-hidden {
             display: none;
         }
+
+        /* 暗色模式自定义样式覆盖 */
+        [data-bs-theme="dark"] .response-item {
+            background: #2b3035;
+            border-color: #495057;
+        }
+
+        [data-bs-theme="dark"] .media-preview {
+            background: #343a40;
+            border-color: #495057;
+        }
+
+        [data-bs-theme="dark"] .keyword-link {
+            color: #6ea8fe;
+        }
+
+        [data-bs-theme="dark"] .keyword-link:hover {
+            color: #8bb9fe;
+        }
+
+        /* 新增：无边框按钮样式 */
+        .btn-no-border {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
     </style>
 </head>
 
 <body>
     <div id="app" class="container mt-4" v-cloak>
-        <h1 class="mb-4">🔑 关键词PRO 管理</h1>
+        <!-- 标题与操作按钮行（无边框按钮） -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 class="mb-0">🔑 关键词PRO 管理</h1>
+            <div class="d-flex gap-2 align-items-center">
+                <!-- GitHub 仓库按钮（仅图标，无边框）改为 btn-lg 增大尺寸，并将图标放大至24px -->
+                <!-- GitHub 仓库按钮 -->
+                <a href="https://github.com/Yangyuwuhan/astrbot_plugin_keywords_pro" target="_blank"
+                    class="btn btn-lg btn-outline-secondary btn-no-border d-flex align-items-center" title="查看GitHub仓库">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                        class="bi bi-github" viewBox="0 0 16 16">
+                        <path
+                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8" />
+                    </svg>
+                </a>
+
+                <!-- 主题切换按钮 -->
+                <button class="btn btn-lg btn-outline-secondary btn-no-border d-flex align-items-center"
+                    @click="toggleTheme" :title="isDark ? '切换到亮色' : '切换到暗色'">
+                    <span v-if="isDark">☀️</span><span v-else>🌙</span>
+                </button>
+            </div>
+        </div>
 
         <!-- 顶部操作栏 -->
         <div class="d-flex justify-content-between mb-3">
@@ -171,7 +218,6 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <strong>回复 #{{ idx+1 }}</strong>
                                 <div>
-                                    <!-- 合并的上传文件按钮，位于移除按钮左侧 -->
                                     <button class="btn btn-sm btn-outline-primary me-2" @click="triggerFileUpload(idx)"
                                         :disabled="uploadingMap[idx]">
                                         📁 上传文件
@@ -181,23 +227,19 @@
                                         @click="removeResponse(idx)">移除</button>
                                 </div>
                             </div>
-                            <!-- 隐藏的文件输入，用于上传 -->
                             <input type="file" :id="'file-input-' + idx" class="file-input-hidden" multiple
                                 accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.mp4,.avi,.mov,.mkv,image/*,video/*"
                                 @change="handleFileSelected($event, idx)">
 
-                            <!-- 文本输入 -->
                             <div class="mb-2">
                                 <label class="form-label">文本</label>
                                 <textarea class="form-control" rows="2" v-model="resp.text"></textarea>
                             </div>
 
-                            <!-- 图片区域：仅在数组非空时显示 -->
                             <div v-if="resp.image && resp.image.length > 0" class="mb-2">
                                 <label class="form-label">图片（JSON数组，可直接编辑）</label>
                                 <input type="text" class="form-control mb-1" :value="JSON.stringify(resp.image)"
                                     @input="updateImageFromInput(resp, $event)">
-                                <!-- 图片预览 -->
                                 <div class="media-preview" v-if="resp.image.length > 0">
                                     <div v-for="(img, imgIdx) in resp.image" :key="imgIdx" class="media-item">
                                         <img :src="'/files/' + encodeURIComponent(img)" alt="图片"
@@ -207,12 +249,10 @@
                                 </div>
                             </div>
 
-                            <!-- 视频区域：仅在数组非空时显示 -->
                             <div v-if="resp.video && resp.video.length > 0" class="mb-2">
                                 <label class="form-label">视频（JSON数组，可直接编辑）</label>
                                 <input type="text" class="form-control mb-1" :value="JSON.stringify(resp.video)"
                                     @input="updateVideoFromInput(resp, $event)">
-                                <!-- 视频预览（显示文件名） -->
                                 <div class="media-preview" v-if="resp.video.length > 0">
                                     <div v-for="(vid, vidIdx) in resp.video" :key="vidIdx" class="media-item">
                                         <span>{{ vid }}</span>
@@ -244,11 +284,33 @@
                 const editKey = ref('');
                 const editAliases = ref('');
                 const editResponses = ref([]);
-                const uploadingMap = reactive({}); // 记录每个回复的上传状态
+                const uploadingMap = reactive({});
+
+                // 主题相关
+                const isDark = ref(false);
+
+                // 初始化主题
+                const initTheme = () => {
+                    const savedTheme = localStorage.getItem('keywords_pro_theme');
+                    if (savedTheme === 'dark') {
+                        isDark.value = true;
+                        document.documentElement.setAttribute('data-bs-theme', 'dark');
+                    } else {
+                        isDark.value = false;
+                        document.documentElement.setAttribute('data-bs-theme', 'light');
+                    }
+                };
+
+                // 切换主题
+                const toggleTheme = () => {
+                    isDark.value = !isDark.value;
+                    const theme = isDark.value ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-bs-theme', theme);
+                    localStorage.setItem('keywords_pro_theme', theme);
+                };
 
                 let bsEditModal = null;
 
-                // 标准化回复数据（确保 image/video 为数组）
                 function normalizeResponse(resp) {
                     if (!resp) return { text: '', image: [], video: [] };
                     const text = resp.text || '';
@@ -263,7 +325,6 @@
                     return { text, image, video };
                 }
 
-                // 格式化时间
                 function formatTime(isoString) {
                     if (!isoString) return '-';
                     try {
@@ -283,27 +344,20 @@
                     }
                 }
 
-                // 从 JSON 字符串更新图片数组
                 function updateImageFromInput(resp, event) {
                     try {
                         const val = JSON.parse(event.target.value);
                         resp.image = Array.isArray(val) ? val : (val ? [val] : []);
-                    } catch {
-                        // 如果解析失败，保持原样
-                    }
+                    } catch { }
                 }
 
-                // 从 JSON 字符串更新视频数组
                 function updateVideoFromInput(resp, event) {
                     try {
                         const val = JSON.parse(event.target.value);
                         resp.video = Array.isArray(val) ? val : (val ? [val] : []);
-                    } catch {
-                        // 忽略
-                    }
+                    } catch { }
                 }
 
-                // 删除单个媒体文件
                 function removeMedia(resp, type, index) {
                     if (type === 'image') {
                         resp.image.splice(index, 1);
@@ -426,7 +480,6 @@
                     }
                 }
 
-                // 触发文件选择
                 function triggerFileUpload(idx) {
                     const inputId = 'file-input-' + idx;
                     const input = document.getElementById(inputId);
@@ -435,7 +488,6 @@
                     }
                 }
 
-                // 处理文件上传，自动分类
                 async function handleFileSelected(event, idx) {
                     const files = event.target.files;
                     if (!files.length) return;
@@ -479,10 +531,9 @@
                             }
                         }
                     }
-                    event.target.value = ''; // 清空，允许重新选择同一文件
+                    event.target.value = '';
                 }
 
-                // ---------- 新增：清理未使用文件 ----------
                 async function cleanupUnusedFiles() {
                     if (!confirm("这将删除插件存储的所有没有被任何回复引用的文件。确定继续吗？")) {
                         return;
@@ -507,6 +558,7 @@
                     bsEditModal = new bootstrap.Modal(document.getElementById('editModal'));
                     checkAuth();
                     loadKeywords();
+                    initTheme(); // 初始化主题
                 });
 
                 return {
@@ -517,6 +569,8 @@
                     editAliases,
                     editResponses,
                     uploadingMap,
+                    isDark, // 导出主题状态
+                    toggleTheme, // 导出切换方法
                     refreshData,
                     newKeyword,
                     editKeyword,
@@ -530,7 +584,7 @@
                     updateImageFromInput,
                     updateVideoFromInput,
                     removeMedia,
-                    cleanupUnusedFiles  // 新增
+                    cleanupUnusedFiles
                 };
             }
         });
