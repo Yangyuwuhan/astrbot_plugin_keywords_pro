@@ -207,9 +207,9 @@ astrbot_plugin_keywords_pro/
 }
 ```
 
-## 变量支持
+## 变量
 
-在回复文本中，您可以使用以下变量，插件会自动替换为对应的值：
+在回复文本中，你可以使用以下变量：
 
 | 变量              | 描述                 | 示例                |
 | ----------------- | -------------------- | ------------------- |
@@ -221,7 +221,7 @@ astrbot_plugin_keywords_pro/
 
 **示例**：
 
-- 文本内容：`现在时间是{time}，今天是{date}，星期{day_of_week}`
+- 文本内容：`现在时间是{time}，今天是{date}，{day_of_week}`
 - 实际发送：`现在时间是14:30:45，今天是2024-01-01，星期一`
 
 ### 使用
@@ -232,7 +232,7 @@ astrbot_plugin_keywords_pro/
 
 ### ⚠️ 跨平台部署
 
-    如果您的 AstrBot 运行在 Windows 主机，而 Napcat（或其他协议端）运行在 WSL2 或容器中，由于文件系统隔离，无法通过本地文件路径直接发送文件。本插件通过 HTTP 服务提供对文件访问，您需要正确配置`webui_base_url`：
+如果你的 AstrBot 运行在 Windows 主机，而 Napcat（或其他协议端）运行在 WSL2 或容器中，由于文件系统隔离，无法通过本地文件路径直接发送文件。本插件通过 HTTP 服务提供对文件访问，你需要正确配置`webui_base_url`：
 
 1. 在插件配置中，将 `webui_base_url` 设置为 Windows 主机的局域网 IP（例如 `http://192.168.1.100:5678`），不能使用 `127.0.0.1`
 2. 请确保 Windows 防火墙允许端口 5678 的入站连接
@@ -257,7 +257,7 @@ cat /etc/resolv.conf | grep nameserver | awk '{print $2}'
 
 ### 问题反馈
 
-    如遇bug或有改进建议请提交 issue
+如遇bug或有改进建议请提交 issue
 
 ### 许可证
 
