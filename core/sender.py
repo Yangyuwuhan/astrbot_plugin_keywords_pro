@@ -32,7 +32,16 @@ class MessageSender:
             if vid:
                 yield [self._video_from_file(vid)]
 
+        for file in response.get("file", []):
+            if file:
+                yield [self._file_from_file(file)]
+
     def _video_from_file(self, filename: str) -> Comp.Video:
         encoded = urllib.parse.quote(filename)
         video_url = f"{self.webui_base_url}/files/{encoded}"
         return Comp.Video.fromURL(url=video_url)
+
+    def _file_from_file(self, filename: str) -> Comp.File:
+        encoded = urllib.parse.quote(filename)
+        file_url = f"{self.webui_base_url}/files/{encoded}"
+        return Comp.File(name=filename, url=file_url)

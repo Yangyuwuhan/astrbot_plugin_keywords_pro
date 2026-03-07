@@ -17,16 +17,36 @@ from .utils import safe_path_resolve
 class WebServer:
     CLIENT_MAX_SIZE = 50 * 1024 * 1024  # 50MB
     ALLOWED_EXTENSIONS = {
+        # 图片
         ".png",
         ".jpg",
         ".jpeg",
         ".gif",
         ".webp",
         ".bmp",
+        # 视频
         ".mp4",
         ".avi",
         ".mov",
         ".mkv",
+        # 文档
+        ".doc",
+        ".docx",
+        ".pdf",
+        ".txt",
+        ".md",
+        ".rtf",
+        # 压缩文件
+        ".zip",
+        ".rar",
+        ".7z",
+        ".tar",
+        ".gz",
+        # 其他
+        ".exe",
+        ".dll",
+        ".apk",
+        ".ipa",
     }
 
     def __init__(self, plugin, host="0.0.0.0", port=5678):
@@ -321,6 +341,11 @@ class WebServer:
                             used_files.update(videos)
                         elif isinstance(videos, str) and videos:
                             used_files.add(videos)
+                        files = resp.get("file", [])
+                        if isinstance(files, list):
+                            used_files.update(files)
+                        elif isinstance(files, str) and files:
+                            used_files.add(files)
 
                 all_files = set()
                 exclude_files = {"keywords.json"}

@@ -124,7 +124,7 @@ class KeywordsProPlugin(Star):
         for keyword, data in self.keywords_data.items():
             responses = data.get("responses", [])
             for resp in responses:
-                for media_type in ["image", "video"]:
+                for media_type in ["image", "video", "file"]:
                     files = resp.get(media_type, [])
                     if not files:
                         continue

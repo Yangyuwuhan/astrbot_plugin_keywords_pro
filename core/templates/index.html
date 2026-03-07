@@ -271,7 +271,7 @@
                                 </div>
                             </div>
                             <input type="file" :id="'file-input-' + idx" class="file-input-hidden" multiple
-                                accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.mp4,.avi,.mov,.mkv,image/*,video/*"
+                                accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.mp4,.avi,.mov,.mkv,image/*,video/*,.doc,.docx,.pdf,.txt,.md,.rtf,.zip,.rar,.7z,.tar,.gz,.exe,.dll,.apk,.ipa"
                                 @change="handleFileSelected($event, idx)">
 
                             <div class="mb-2">
@@ -300,6 +300,18 @@
                                     <div v-for="(vid, vidIdx) in resp.video" :key="vidIdx" class="media-item">
                                         <span>{{ vid }}</span>
                                         <span class="remove-media" @click="removeMedia(resp, 'video', vidIdx)">×</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="resp.file && resp.file.length > 0" class="mb-2">
+                                <label class="form-label">其他文件（JSON数组，可直接编辑）</label>
+                                <input type="text" class="form-control mb-1" :value="JSON.stringify(resp.file)"
+                                    @input="updateFileFromInput(resp, $event)">
+                                <div class="media-preview" v-if="resp.file.length > 0">
+                                    <div v-for="(file, fileIdx) in resp.file" :key="fileIdx" class="media-item">
+                                        <span>{{ file }}</span>
+                                        <span class="remove-media" @click="removeMedia(resp, 'file', fileIdx)">×</span>
                                     </div>
                                 </div>
                             </div>
@@ -372,7 +384,7 @@
                 let bsEditModal = null;
 
                 function normalizeResponse(resp) {
-                    if (!resp) return { text: '', image: [], video: [] };
+                    if (!resp) return { text: '', image: [], video: [], file: [] };
                     const text = resp.text || '';
                     let image = resp.image;
                     if (image === undefined || image === null) image = [];
@@ -382,7 +394,11 @@
                     if (video === undefined || video === null) video = [];
                     else if (!Array.isArray(video)) video = video ? [video] : [];
                     else video = video.map(v => v.trim()).filter(v => v !== '');
-                    return { text, image, video };
+                    let file = resp.file;
+                    if (file === undefined || file === null) file = [];
+                    else if (!Array.isArray(file)) file = file ? [file] : [];
+                    else file = file.map(f => f.trim()).filter(f => f !== '');
+                    return { text, image, video, file };
                 }
 
                 function formatTime(isoString) {
@@ -418,11 +434,20 @@
                     } catch { }
                 }
 
+                function updateFileFromInput(resp, event) {
+                    try {
+                        const val = JSON.parse(event.target.value);
+                        resp.file = Array.isArray(val) ? val : (val ? [val] : []);
+                    } catch { }
+                }
+
                 function removeMedia(resp, type, index) {
                     if (type === 'image') {
                         resp.image.splice(index, 1);
-                    } else {
+                    } else if (type === 'video') {
                         resp.video.splice(index, 1);
+                    } else if (type === 'file') {
+                        resp.file.splice(index, 1);
                     }
                 }
 
@@ -508,7 +533,8 @@
                     const responses = editResponses.value.map(r => ({
                         text: r.text || '',
                         image: r.image,
-                        video: r.video
+                        video: r.video,
+                        file: r.file
                     }));
                     const data = {
                         aliases,
@@ -601,7 +627,9 @@
                                         resp.video.push(data.filename);
                                     }
                                 } else {
-                                    alert(`不支持的文件类型: ${ext}`);
+                                    if (!resp.file.includes(data.filename)) {
+                                        resp.file.push(data.filename);
+                                    }
                                 }
                             } else {
                                 alert(`${file.name} 上传失败: ${data.error}`);
@@ -674,6 +702,7 @@
                     formatTime,
                     updateImageFromInput,
                     updateVideoFromInput,
+                    updateFileFromInput,
                     removeMedia,
                     cleanupUnusedFiles
                 };

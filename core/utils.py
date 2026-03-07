@@ -41,8 +41,8 @@ def file_exists(base_dir: str | Path, filename: str) -> bool:
 
 
 def normalize_media(resp: dict) -> None:
-    """将单字符串的image/video转为列表"""
-    for media in ["image", "video"]:
+    """将单字符串的image/video/file转为列表"""
+    for media in ["image", "video", "file"]:
         val = resp.get(media)
         if val is None:
             resp[media] = []
