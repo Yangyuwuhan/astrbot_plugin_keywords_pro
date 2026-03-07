@@ -40,8 +40,8 @@ class WebServer:
         self.runner = None
         self.site = None
         self._started = False
-        # 静态文件目录：插件目录下的 webUI
-        self.static_dir = Path(__file__).parent / "webUI"
+        # 静态文件目录：插件目录下的 templates
+        self.static_dir = Path(__file__).parent / "templates"
         self._ensure_static_dir()
         self._cookie_name = "keywords_webui_session"
         self._sessions = {}
