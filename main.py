@@ -7,7 +7,7 @@ from pathlib import Path
 from croniter import croniter
 
 from astrbot.api import logger
-from astrbot.api.event import AstrMessageEvent, filter, MessageChain
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
 
 from .core import config as cfg

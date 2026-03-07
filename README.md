@@ -18,7 +18,7 @@
 
 ## 安装
 
-将插件目录 `astrbot_plugin_keywords_pro`复制到 `AstrBot/data/plugins/`目录下，重启AstrBot
+将插件文件 `astrbot_plugin_keywords_pro`复制到 `AstrBot/data/plugins/`目录下，重启AstrBot
 
 ## 文件结构
 
@@ -70,11 +70,11 @@ astrbot_plugin_keywords_pro/
 2. 使用默认密码 `keywords@pro` 登录（可在配置中修改）
 3. 在WebUI中可以：
 
-   - 查看、添加、编辑、删除关键词
-   - 重命名关键词
-   - 上传和管理文件：支持上传的文件类型：图片（.png, .jpg, .jpeg, .gif, .webp, .bmp）、视频（.mp4, .avi, .mov, .mkv）、文档（.doc, .docx, .pdf, .txt, .md, .rtf）、压缩文件（.zip, .rar, .7z, .tar, .gz）等等
+   - 重命名、查看、添加、编辑、删除关键词
+   - 上传和管理文件：支持上传的文件类型：图片（.png, .jpg, .jpeg, .gif, .webp, .bmp）、视频（.mp4, .avi, .mov, .mkv）、音频（.mp3, .wav, .ogg, .flac, .aac）、文档（.doc, .docx, .pdf, .txt, .md, .rtf）、压缩文件（.zip, .rar, .7z, .tar, .gz）等等
    - 清理未使用的文件
-   - 配置定时任务（Cron表达式）、正则匹配、唤醒要求
+   - 配置唤醒要求、正则匹配、定时任务
+   - ~~点击右上角进入本项目仓库，为本项目点击一个 Star~~ 
 
 ### 手动配置
 
@@ -207,18 +207,27 @@ astrbot_plugin_keywords_pro/
 }
 ```
 
+## 变量支持
+
+在回复文本中，您可以使用以下变量，插件会自动替换为对应的值：
+
+| 变量              | 描述                 | 示例                |
+| ----------------- | -------------------- | ------------------- |
+| `{time}`        | 当前时间（24小时制） | 14:30:45            |
+| `{date}`        | 当前日期             | 2024-01-01          |
+| `{datetime}`    | 当前日期时间         | 2024-01-01 14:30:45 |
+| `{random}`      | 1-100之间的随机数    | 42                  |
+| `{day_of_week}` | 当前星期几（中文）   | 星期一              |
+
+**使用示例**：
+
+- 文本内容：`现在时间是{time}，今天是{date}，星期{day_of_week}`
+- 实际发送：`现在时间是14:30:45，今天是2024-01-01，星期一`
+
 ## 注意事项
 
-- **消息发送规则**：
-
-  - 文字和图片会合并在同一条消息中发送
-  - 视频和文件会每个单独发送一条消息
-  - 支持同时发送多个图片、视频和文件
 - **平台支持**：作者仅测试了 aiocqhttp 平台
-- **空配置处理**：
-
-  - 当配置了关键词，但其回复内容为空时，本插件不会进行任何操作
-  - 不会阻碍LLM的正常工作
+- **空配置处理**：当配置了关键词，但其回复内容为空时，本插件不会进行任何操作，也不会阻碍LLM的正常工作
 - **定时任务**：
 
   - 定时任务需要设置cron_expression（Cron表达式）和whitelist（发送目标）
@@ -233,18 +242,18 @@ astrbot_plugin_keywords_pro/
 2. 机器人会根据配置的模式回复相应的内容
 3. 管理员可以发送 `/keywords`指令查看当前已设置的关键词及其别名
 
-### ⚠️ 跨平台部署注意事项
+### ⚠️ 跨平台部署
 
     如果您的 AstrBot 运行在 Windows 主机，而 Napcat（或其他协议端）运行在 WSL2 或容器中，由于文件系统隔离，无法通过本地文件路径直接发送视频。本插件通过 HTTP 服务提供视频文件访问，您需要正确配置 webui_base_url：
     1. 在插件配置中，将 webui_base_url 设置为 Windows 主机的局域网 IP（例如 http://192.168.1.100:5678），不能使用 127.0.0.1。
     2. 请确保 Windows 防火墙允许端口 5678 的入站连接。
-    3. 如果您在 WSL2 中运行协议端，可以通过以下命令获取 Windows 主机的 IP 地址：``bash        wsl        cat /etc/resolv.conf | grep nameserver | awk '{print $2}'        ``
-       执行上述命令后，会返回 Windows 主机的 IP 地址，您可以将其用于 webui_base_url 的配置。
+    3. 你可以通过以下命令获取 Windows 主机的 IP 地址：
+
+``bash        wsl        cat /etc/resolv.conf | grep nameserver | awk '{print $2}'        ``
 
 ### 问题反馈
 
-1. 提交 issue
-2. 添加 QQ群: 1083269367 进行反馈，注意入群后及时完成人机验证
+    如遇bug或有改进建议请提交 issue
 
 ## 许可证
 

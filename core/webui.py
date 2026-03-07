@@ -29,6 +29,12 @@ class WebServer:
         ".avi",
         ".mov",
         ".mkv",
+        # 音频
+        ".mp3",
+        ".wav",
+        ".ogg",
+        ".flac",
+        ".aac",
         # 文档
         ".doc",
         ".docx",

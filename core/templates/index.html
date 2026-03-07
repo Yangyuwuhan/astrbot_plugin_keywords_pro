@@ -129,7 +129,8 @@
     <div id="app" class="container mt-4" v-cloak>
         <!-- 标题与操作按钮行 -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1 class="mb-0">🔑 关键词PRO 管理</h1>
+            <h1 class="mb-0"><img src="/web/logo.png" alt="关键词PRO"
+                    style="height: 48px; vertical-align: middle; margin-right: 8px;"> 关键词 PRO</h1>
             <div class="d-flex gap-2 align-items-center">
                 <!-- GitHub 仓库按钮 -->
                 <a href="https://github.com/Yangyuwuhan/astrbot_plugin_keywords_pro" target="_blank"
@@ -206,7 +207,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">{{ editMode === 'add' ? '新增关键词' : '编辑关键词' }}</h5>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 me-4 ms-4">
                             <!-- 唤醒按钮 -->
                             <button class="btn btn-sm" :class="editNeedWake ? 'btn-success' : 'btn-outline-secondary'"
                                 @click="editNeedWake = !editNeedWake" title="是否需要唤醒">
@@ -229,7 +230,7 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">关键词</label>
-                            <input type="text" class="form-control" v-model="editKey" :readonly="editMode==='edit'">
+                            <input type="text" class="form-control" v-model="editKey">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">别名（逗号分隔）</label>
@@ -271,7 +272,7 @@
                                 </div>
                             </div>
                             <input type="file" :id="'file-input-' + idx" class="file-input-hidden" multiple
-                                accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.mp4,.avi,.mov,.mkv,image/*,video/*,.doc,.docx,.pdf,.txt,.md,.rtf,.zip,.rar,.7z,.tar,.gz,.exe,.dll,.apk,.ipa"
+                                accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.mp4,.avi,.mov,.mkv,image/*,video/*,.mp3,.wav,.ogg,.flac,.aac,audio/*,.doc,.docx,.pdf,.txt,.md,.rtf,.zip,.rar,.7z,.tar,.gz,.exe,.dll,.apk,.ipa"
                                 @change="handleFileSelected($event, idx)">
 
                             <div class="mb-2">
