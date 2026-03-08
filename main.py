@@ -110,17 +110,14 @@ class KeywordsProPlugin(Star):
             default_keyword = "示例关键词"
             default_data = {
                 "aliases": ["例子", "示例"],
-                "responses": [
-                    {"text": "这是一个示例回复", "image": [], "video": []},
-                    {"text": "示例多张图片", "image": ["example.jpg"], "video": []},
-                ],
+                "responses": [{"text": "这是一个示例回复", "image": [], "video": []}],
                 "created_at": now,
                 "updated_at": now,
-                "need_wake": True,  # 默认需要唤醒
+                "need_wake": True,
                 "regex_match": False,
                 "cron_enabled": False,
                 "cron_config": default_cron_config,
-                "enabled": True,  # 默认启用
+                "enabled": True,
             }
             self._save_keyword(default_keyword, default_data)
             data[default_keyword] = default_data
