@@ -1,10 +1,11 @@
 name: astrbot_plugin_keywords_pro
 display_name: 关键词PRO
 author: Yangyuwuhan
-description: 关键词回复插件增强版，支持多模式，多文件，多功能，支持 WebUI 管理
+description: 基于 AstrBot 关键词 PRO 插件，多功能，模块化，提供WebUI管理
 version: "3.3.0"
 repo: "https://github.com/Yangyuwuhan/astrbot_plugin_keywords_pro"
 support_platforms:
   - aiocqhttp
+
 
 
