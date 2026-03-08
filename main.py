@@ -9,27 +9,25 @@ from croniter import croniter
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from .core import config as cfg
 from .core import sender, utils, webui
-
-# 兼容不同 AstrBot 版本，获取数据根目录
-try:
-    from astrbot.core.utils.astrbot_path import get_astrbot_data_path
-
-    _data_root = get_astrbot_data_path()
-except ImportError:
-    _base = Path(__file__).parent.parent.parent.parent
-    _data_root = _base / "data"
-    logger.warning(f"使用备用数据目录: {_data_root}")
 
 
 class KeywordsProPlugin(Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
-        # 数据目录：AstrBot 数据根目录下的 keywords_data
-        self.data_dir = Path(_data_root) / "keywords_data"
+
+        _data_root = get_astrbot_data_path()
+        # 数据目录：遵循 AstrBot 插件存储规范，存储于 data/plugin_data/{plugin_name}/ 目录下
+        plugin_data_path = (
+            Path(_data_root)
+            / "plugin_data"
+            / (self.name if hasattr(self, "name") else "astrbot_plugin_keywords_pro")
+        )
+        self.data_dir = plugin_data_path
         self.data_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"关键词数据目录: {self.data_dir}")
 
