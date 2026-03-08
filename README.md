@@ -1,6 +1,6 @@
 # 关键词 PRO
 
-基于AstrBot关键词回复 PRO，支持多种模式，并提供WebUI管理
+基于 AstrBot 关键词 PRO 插件，多功能，模块化，提供WebUI管理
 
 ## 功能特点
 
@@ -177,3 +177,4 @@ cat /etc/resolv.conf | grep nameserver | awk '{print $2}'
 ## 许可证
 
 AGPL-3.0 License
+
