@@ -31,12 +31,12 @@ class KeywordsProPlugin(Star):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"关键词数据目录: {self.data_dir}")
 
-        self.keywords_file = self.data_dir / "keywords.json"
         self.config_mgr = cfg.ConfigManager(self.config)
         self.keywords_data = self._load_keywords()
         self._validate_keywords_files()
         self.sender = sender.MessageSender(
-            data_dir=self.data_dir, webui_base_url=self.config_mgr.get_webui_base_url()
+            plugin_data_dir=self.data_dir,
+            webui_base_url=self.config_mgr.get_webui_base_url(),
         )
         self._keywords_lock = asyncio.Lock()
         self._scheduler_lock = asyncio.Lock()
@@ -53,73 +53,100 @@ class KeywordsProPlugin(Star):
     def _load_keywords(self):
         """加载关键词数据，并确保每个关键词拥有必要字段"""
         default_cron_config = {"cron_expression": "", "whitelist": [], "blacklist": []}
+        data = {}
 
-        if self.keywords_file.exists():
-            try:
-                with open(self.keywords_file, encoding="utf-8") as f:
-                    data = json.load(f)
-                modified = False
-                now = utils.current_time_iso()
-                for kw, item in data.items():
-                    responses = item.get("responses", [])
-                    for resp in responses:
-                        utils.normalize_media(resp)
-                    if "created_at" not in item:
-                        item["created_at"] = now
-                        modified = True
-                    if "updated_at" not in item:
-                        item["updated_at"] = now
-                        modified = True
-                    # 确保 need_wake 字段存在，默认 True
-                    if "need_wake" not in item:
-                        item["need_wake"] = True
-                        modified = True
-                    if "regex_match" not in item:
-                        item["regex_match"] = False
-                        modified = True
-                    if "cron_enabled" not in item:
-                        item["cron_enabled"] = False
-                        modified = True
-                    if "cron_config" not in item:
-                        item["cron_config"] = default_cron_config.copy()
-                        modified = True
-                if modified:
-                    self._save_keywords(data)
-                return data
-            except Exception as e:
-                logger.error(f"加载关键词文件失败: {e}")
-                return {}
-        else:
+        # 遍历关键词目录
+        for keyword_dir in self.data_dir.iterdir():
+            if keyword_dir.is_dir():
+                keyword = keyword_dir.name
+                keyword_file = keyword_dir / "keywords.json"
+                if keyword_file.exists():
+                    try:
+                        with open(keyword_file, encoding="utf-8") as f:
+                            keyword_data = json.load(f)
+                        # 确保必要字段存在
+                        modified = False
+                        now = utils.current_time_iso()
+                        if "created_at" not in keyword_data:
+                            keyword_data["created_at"] = now
+                            modified = True
+                        if "updated_at" not in keyword_data:
+                            keyword_data["updated_at"] = now
+                            modified = True
+                        if "need_wake" not in keyword_data:
+                            keyword_data["need_wake"] = True
+                            modified = True
+                        if "regex_match" not in keyword_data:
+                            keyword_data["regex_match"] = False
+                            modified = True
+                        if "cron_enabled" not in keyword_data:
+                            keyword_data["cron_enabled"] = False
+                            modified = True
+                        if "cron_config" not in keyword_data:
+                            keyword_data["cron_config"] = default_cron_config.copy()
+                            modified = True
+                        if "aliases" not in keyword_data:
+                            keyword_data["aliases"] = []
+                            modified = True
+                        if "responses" not in keyword_data:
+                            keyword_data["responses"] = []
+                            modified = True
+                        if "enabled" not in keyword_data:
+                            keyword_data["enabled"] = True
+                            modified = True
+                        # 标准化媒体字段
+                        responses = keyword_data.get("responses", [])
+                        for resp in responses:
+                            utils.normalize_media(resp)
+                        if modified:
+                            self._save_keyword(keyword, keyword_data)
+                        data[keyword] = keyword_data
+                    except Exception as e:
+                        logger.error(f"加载关键词 {keyword} 文件失败: {e}")
+
+        # 如果没有关键词，创建默认关键词
+        if not data:
             now = utils.current_time_iso()
+            default_keyword = "示例关键词"
             default_data = {
-                "示例关键词": {
-                    "aliases": ["例子", "示例"],
-                    "responses": [
-                        {"text": "这是一个示例回复", "image": [], "video": []},
-                        {"text": "示例多张图片", "image": ["example.jpg"], "video": []},
-                    ],
-                    "created_at": now,
-                    "updated_at": now,
-                    "need_wake": True,  # 默认需要唤醒
-                    "regex_match": False,
-                    "cron_enabled": False,
-                    "cron_config": default_cron_config,
-                }
+                "aliases": ["例子", "示例"],
+                "responses": [
+                    {"text": "这是一个示例回复", "image": [], "video": []},
+                    {"text": "示例多张图片", "image": ["example.jpg"], "video": []},
+                ],
+                "created_at": now,
+                "updated_at": now,
+                "need_wake": True,  # 默认需要唤醒
+                "regex_match": False,
+                "cron_enabled": False,
+                "cron_config": default_cron_config,
+                "enabled": True,  # 默认启用
             }
-            logger.info(f"关键词文件不存在，创建默认关键词数据: {self.keywords_file}")
-            self._save_keywords(default_data)
-            return default_data
+            self._save_keyword(default_keyword, default_data)
+            data[default_keyword] = default_data
 
-    def _save_keywords(self, data):
+        return data
+
+    def _save_keyword(self, keyword: str, data: dict):
+        """保存单个关键词的数据"""
+        keyword_dir = self.data_dir / keyword
+        keyword_dir.mkdir(parents=True, exist_ok=True)
+        keyword_file = keyword_dir / "keywords.json"
         try:
-            with open(self.keywords_file, "w", encoding="utf-8") as f:
+            with open(keyword_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"保存关键词文件失败: {e}")
+            logger.error(f"保存关键词 {keyword} 文件失败: {e}")
+
+    def _save_keywords(self, data):
+        """保存所有关键词数据"""
+        for keyword, keyword_data in data.items():
+            self._save_keyword(keyword, keyword_data)
 
     def _validate_keywords_files(self):
         modified = False
         for keyword, data in self.keywords_data.items():
+            keyword_dir = self.data_dir / keyword
             responses = data.get("responses", [])
             for resp in responses:
                 for media_type in ["image", "video", "file"]:
@@ -127,7 +154,7 @@ class KeywordsProPlugin(Star):
                     if not files:
                         continue
                     original = files[:]
-                    files[:] = [f for f in files if utils.file_exists(self.data_dir, f)]
+                    files[:] = [f for f in files if utils.file_exists(keyword_dir, f)]
                     if len(files) != len(original):
                         modified = True
                         removed = set(original) - set(files)
@@ -159,6 +186,9 @@ class KeywordsProPlugin(Star):
         is_awake = getattr(event, "is_at_or_wake_command", event.is_wake)
 
         for keyword, data in self.keywords_data.items():
+            # 检查是否启用
+            if not data.get("enabled", True):
+                continue
             # 检查是否需要唤醒
             if data.get("need_wake", True) and not is_awake:
                 continue
@@ -166,16 +196,28 @@ class KeywordsProPlugin(Star):
             # 检查是否匹配（正则或精确）
             if data.get("regex_match", False):
                 # 包含匹配
-                if keyword in message_text:
-                    matched_keyword = keyword
-                    keyword_data = data
-                    break
-                for alias in data.get("aliases", []):
-                    if alias in message_text:
+                try:
+                    import re
+
+                    # 检查关键词
+                    if re.search(keyword, message_text):
                         matched_keyword = keyword
-                        matched_alias = alias
                         keyword_data = data
                         break
+                    # 检查别名
+                    for alias in data.get("aliases", []):
+                        if re.search(alias, message_text):
+                            matched_keyword = keyword
+                            matched_alias = alias
+                            keyword_data = data
+                            break
+                    else:
+                        # 如果没有匹配到别名，继续下一个关键词
+                        continue
+                    break
+                except re.error as e:
+                    logger.error(f"正则表达式错误 [{keyword}]: {e}")
+                    continue
             else:
                 # 精确匹配
                 if message_text == keyword:
@@ -200,7 +242,7 @@ class KeywordsProPlugin(Star):
                 return
 
             response = random.choice(responses) if len(responses) > 1 else responses[0]
-            for chain in self.sender.build_response_chains(response):
+            for chain in self.sender.build_response_chains(response, matched_keyword):
                 if chain:
                     yield event.chain_result(chain)
 
@@ -301,17 +343,15 @@ class KeywordsProPlugin(Star):
                 if platform.meta().name == "aiocqhttp":
                     platform_ids.append(platform.meta().id)
 
-            # 如果没有找到 aiocqhttp 平台，尝试使用默认的 "aiocqhttp" ID
-            if not platform_ids:
-                platform_ids.append("aiocqhttp")
-
             # 尝试向每个可能的平台 ID 发送消息
             sent = False
             for platform_id in platform_ids:
                 try:
                     # 重新构造 unified_msg_origin
                     new_umo = f"{platform_id}:{msg_type}:{uid if target.startswith('#') else gid}"
-                    for chain_components in self.sender.build_response_chains(response):
+                    for chain_components in self.sender.build_response_chains(
+                        response, keyword
+                    ):
                         if chain_components:
                             # 将消息组件列表转换为 MessageChain 对象
                             message_chain = MessageChain(chain=chain_components)
