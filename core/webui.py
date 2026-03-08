@@ -202,6 +202,8 @@ class WebServer:
                 now = utils.current_time_iso()  # 注意导入utils
                 data["created_at"] = now
                 data["updated_at"] = now
+                if "enabled" not in data:
+                    data["enabled"] = True
                 self.plugin.keywords_data[key] = data
                 self.plugin._save_keywords(self.plugin.keywords_data)
                 # 触发定时任务重新调度
@@ -240,6 +242,8 @@ class WebServer:
                 # 保留创建时间，更新修改时间
                 data["created_at"] = self.plugin.keywords_data[key].get("created_at")
                 data["updated_at"] = utils.current_time_iso()
+                if "enabled" not in data:
+                    data["enabled"] = True
                 self.plugin.keywords_data[key] = data
                 self.plugin._save_keywords(self.plugin.keywords_data)
 
@@ -265,15 +269,28 @@ class WebServer:
         return self._ok()
 
     async def handle_upload_file(self, request):
-        reader = await request.multipart()
-        field = await reader.next()
-        if not field or field.name != "file":
+        # 首先检查查询参数中的关键词（兼容旧方式）
+        keyword = request.query.get("keyword", "").strip()
+
+        # 读取请求体，解析multipart表单数据
+        post_data = await request.post()
+
+        # 检查是否有文件字段
+        if "file" not in post_data:
             return self._err("没有找到文件字段", 400)
 
-        filename = field.filename
+        # 获取文件对象
+        file_obj = post_data["file"]
+        filename = file_obj.filename
+
         if not filename:
             return self._err("文件名为空", 400)
 
+        # 检查是否有关键词字段
+        if "keyword" in post_data:
+            keyword = post_data["keyword"].strip()
+
+        # 检查文件类型
         ext = os.path.splitext(filename)[1].lower()
         if ext not in self.ALLOWED_EXTENSIONS:
             return self._err(
@@ -281,7 +298,16 @@ class WebServer:
             )
 
         safe_name = os.path.basename(filename)
-        save_path = Path(self.plugin.data_dir) / safe_name
+
+        # 确定保存目录
+        if keyword:
+            save_dir = Path(self.plugin.data_dir) / keyword
+        else:
+            save_dir = Path(self.plugin.data_dir) / "default"
+
+        save_dir.mkdir(parents=True, exist_ok=True)
+        save_path = save_dir / safe_name
+
         # 确保在 data_dir 内
         try:
             save_path.resolve().relative_to(Path(self.plugin.data_dir).resolve())
@@ -290,36 +316,59 @@ class WebServer:
 
         size = 0
         try:
+            # 读取文件内容并保存
+            content = file_obj.file.read()
+            size = len(content)
             with open(save_path, "wb") as f:
-                while True:
-                    chunk = await field.read_chunk()
-                    if not chunk:
-                        break
-                    size += len(chunk)
-                    f.write(chunk)
+                f.write(content)
         except Exception as e:
             logger.error(f"保存文件失败: {e}")
             return self._err("文件保存失败", 500)
 
-        logger.info(f"文件上传成功: {save_path}, 大小: {size}")
-        return self._ok({"filename": safe_name})
+        logger.info(f"文件上传成功: {save_path}, 大小: {size}, keyword: {keyword}")
+        return self._ok({"filename": safe_name, "keyword": keyword or "default"})
 
     async def handle_list_files(self, request):
-        data_dir = Path(self.plugin.data_dir)
+        # 获取关键词参数
+        keyword = request.query.get("keyword", "").strip()
+
+        # 确定文件目录
+        if keyword:
+            # 如果提供了关键词，列出对应关键词目录中的文件
+            file_dir = Path(self.plugin.data_dir) / keyword
+        else:
+            # 如果没有提供关键词，列出default目录中的文件
+            file_dir = Path(self.plugin.data_dir) / "default"
+
+        # 确保目录存在
+        if not file_dir.exists():
+            file_dir.mkdir(parents=True, exist_ok=True)
+
         files = []
         try:
-            for entry in data_dir.iterdir():
-                if entry.is_file():
+            for entry in file_dir.iterdir():
+                if entry.is_file() and entry.name != "keywords.json":
                     files.append(entry.name)
         except Exception as e:
             logger.error(f"列出文件失败: {e}")
             return self._err("无法读取文件列表")
-        return self._ok({"files": files})
+        return self._ok({"files": files, "keyword": keyword or "default"})
 
     async def handle_file_download(self, request):
         filename = request.match_info.get("filename", "")
-        logger.debug(f"文件下载请求: {filename}")
-        file_path = safe_path_resolve(self.plugin.data_dir, filename)
+        # 获取关键词参数
+        keyword = request.query.get("keyword", "").strip()
+
+        # 确定文件目录
+        if keyword:
+            # 如果提供了关键词，从对应关键词目录读取
+            file_dir = Path(self.plugin.data_dir) / keyword
+        else:
+            # 如果没有提供关键词，从default目录读取
+            file_dir = Path(self.plugin.data_dir) / "default"
+
+        logger.debug(f"文件下载请求: {filename} from directory: {file_dir}")
+        file_path = safe_path_resolve(file_dir, filename)
         if not file_path or not file_path.is_file():
             raise web.HTTPNotFound()
         logger.debug(f"提供文件: {file_path}")
@@ -333,44 +382,52 @@ class WebServer:
         try:
             plugin = self.plugin
             async with plugin._keywords_lock:
-                used_files = set()
+                # 为每个关键词收集使用的文件
+                used_files = {}
                 for keyword, data in plugin.keywords_data.items():
+                    keyword_used_files = set()
                     responses = data.get("responses", [])
                     for resp in responses:
                         images = resp.get("image", [])
                         if isinstance(images, list):
-                            used_files.update(images)
+                            keyword_used_files.update(images)
                         elif isinstance(images, str) and images:
-                            used_files.add(images)
+                            keyword_used_files.add(images)
                         videos = resp.get("video", [])
                         if isinstance(videos, list):
-                            used_files.update(videos)
+                            keyword_used_files.update(videos)
                         elif isinstance(videos, str) and videos:
-                            used_files.add(videos)
+                            keyword_used_files.add(videos)
                         files = resp.get("file", [])
                         if isinstance(files, list):
-                            used_files.update(files)
+                            keyword_used_files.update(files)
                         elif isinstance(files, str) and files:
-                            used_files.add(files)
+                            keyword_used_files.add(files)
+                    used_files[keyword] = keyword_used_files
 
-                all_files = set()
-                exclude_files = {"keywords.json"}
-                for entry in os.listdir(plugin.data_dir):
-                    if entry in exclude_files:
-                        continue
-                    file_path = os.path.join(plugin.data_dir, entry)
-                    if os.path.isfile(file_path):
-                        all_files.add(entry)
-
-                unused_files = all_files - used_files
                 deleted = []
-                for filename in unused_files:
-                    file_path = os.path.join(plugin.data_dir, filename)
-                    try:
-                        os.remove(file_path)
-                        deleted.append(filename)
-                    except Exception as e:
-                        logger.error(f"删除文件 {filename} 失败: {e}")
+                # 遍历每个关键词目录
+                for keyword_dir in plugin.data_dir.iterdir():
+                    if keyword_dir.is_dir():
+                        keyword = keyword_dir.name
+                        keyword_used_files = used_files.get(keyword, set())
+                        exclude_files = {"keywords.json"}
+
+                        for entry in os.listdir(keyword_dir):
+                            if entry in exclude_files:
+                                continue
+                            file_path = os.path.join(keyword_dir, entry)
+                            if (
+                                os.path.isfile(file_path)
+                                and entry not in keyword_used_files
+                            ):
+                                try:
+                                    os.remove(file_path)
+                                    deleted.append(f"{keyword}/{entry}")
+                                except Exception as e:
+                                    logger.error(
+                                        f"删除文件 {keyword}/{entry} 失败: {e}"
+                                    )
 
                 logger.info(f"已删除未使用文件: {deleted}")
                 return self._ok({"deleted": deleted, "count": len(deleted)})
