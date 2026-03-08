@@ -1,9 +1,9 @@
 name: astrbot_plugin_keywords_pro
 display_name: 关键词PRO
 author: Yangyuwuhan
-description: 关键词回复插件增强版，支持固定回复和随机回复模式，可设置关键词别名、群聊白名单和黑名单，支持同时回复文字+图片+视频
+description: 关键词回复插件增强版，支持多模式，多文件，多功能，支持 WebUI 管理
 version: "3.2.1"
 repo: "https://github.com/Yangyuwuhan/astrbot_plugin_keywords_pro"
 support_platforms:
-
   - aiocqhttp
+
