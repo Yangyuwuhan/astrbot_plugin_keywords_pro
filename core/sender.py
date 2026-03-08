@@ -5,12 +5,11 @@ from datetime import datetime
 from pathlib import Path
 
 import astrbot.api.message_components as Comp
-from astrbot.api import logger
 
 
 class MessageSender:
-    def __init__(self, data_dir: Path, webui_base_url: str):
-        self.data_dir = data_dir
+    def __init__(self, plugin_data_dir: Path, webui_base_url: str):
+        self.plugin_data_dir = plugin_data_dir
         self.webui_base_url = webui_base_url.rstrip("/")
 
     def _replace_variables(self, text: str) -> str:
@@ -38,7 +37,9 @@ class MessageSender:
 
         return text
 
-    def build_response_chains(self, response: dict) -> Generator[list, None, None]:
+    def build_response_chains(
+        self, response: dict, keyword: str = ""
+    ) -> Generator[list, None, None]:
         chain_text_image = []
 
         if response.get("text"):
@@ -46,31 +47,44 @@ class MessageSender:
             text = self._replace_variables(response["text"])
             chain_text_image.append(Comp.Plain(text=text))
 
+        # 确定当前关键词的目录（不再直接使用本地路径，而是通过URL访问）
+
         for img in response.get("image", []):
             if img:
-                img_path = self.data_dir / img
-                if img_path.exists():
-                    chain_text_image.append(Comp.Image.fromFileSystem(str(img_path)))
+                # 使用URL方式访问图片，解决跨平台访问问题
+                encoded_filename = urllib.parse.quote(img)
+                if keyword:
+                    encoded_keyword = urllib.parse.quote(keyword)
+                    image_url = f"{self.webui_base_url}/files/{encoded_filename}?keyword={encoded_keyword}"
                 else:
-                    logger.warning(f"图片文件不存在: {img_path}")
+                    image_url = f"{self.webui_base_url}/files/{encoded_filename}"
+                chain_text_image.append(Comp.Image.fromURL(url=image_url))
 
         if chain_text_image:
             yield chain_text_image
 
         for vid in response.get("video", []):
             if vid:
-                yield [self._video_from_file(vid)]
+                yield [self._video_from_file(vid, keyword)]
 
         for file in response.get("file", []):
             if file:
-                yield [self._file_from_file(file)]
+                yield [self._file_from_file(file, keyword)]
 
-    def _video_from_file(self, filename: str) -> Comp.Video:
-        encoded = urllib.parse.quote(filename)
-        video_url = f"{self.webui_base_url}/files/{encoded}"
+    def _video_from_file(self, filename: str, keyword: str = "") -> Comp.Video:
+        encoded_filename = urllib.parse.quote(filename)
+        if keyword:
+            encoded_keyword = urllib.parse.quote(keyword)
+            video_url = f"{self.webui_base_url}/files/{encoded_filename}?keyword={encoded_keyword}"
+        else:
+            video_url = f"{self.webui_base_url}/files/{encoded_filename}"
         return Comp.Video.fromURL(url=video_url)
 
-    def _file_from_file(self, filename: str) -> Comp.File:
-        encoded = urllib.parse.quote(filename)
-        file_url = f"{self.webui_base_url}/files/{encoded}"
+    def _file_from_file(self, filename: str, keyword: str = "") -> Comp.File:
+        encoded_filename = urllib.parse.quote(filename)
+        if keyword:
+            encoded_keyword = urllib.parse.quote(keyword)
+            file_url = f"{self.webui_base_url}/files/{encoded_filename}?keyword={encoded_keyword}"
+        else:
+            file_url = f"{self.webui_base_url}/files/{encoded_filename}"
         return Comp.File(name=filename, url=file_url)
