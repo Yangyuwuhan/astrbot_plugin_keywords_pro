@@ -168,6 +168,7 @@
                     <tr>
                         <th>关键词</th>
                         <th>别名</th>
+                        <th>启用</th>
                         <th>唤醒</th>
                         <th>正则</th>
                         <th>定时</th>
@@ -188,13 +189,16 @@
                             </span>
                             <span v-else class="text-muted">无</span>
                         </td>
+                        <td>{{ kwData.enabled ? '✅' : '❌' }}</td>
                         <td>{{ kwData.need_wake ? '✅' : '❌' }}</td>
                         <td>{{ kwData.regex_match ? '✅' : '❌' }}</td>
                         <td>{{ kwData.cron_enabled ? '✅' : '❌' }}</td>
                         <td>{{ formatTime(kwData.created_at) }}</td>
                         <td>{{ kwData.responses ? kwData.responses.length : 0 }}</td>
                         <td class="table-actions">
-                            <button class="btn btn-sm btn-outline-danger" @click="deleteKeyword(kw)">删除</button>
+                            <button class="btn btn-sm" :class="kwData.enabled ? 'btn-success' : 'btn-outline-secondary'"
+                                @click="toggleEnabled(kw)">启用</button>
+                            <button class="btn btn-sm btn-outline-danger ms-2" @click="deleteKeyword(kw)">删除</button>
                         </td>
                     </tr>
                 </tbody>
@@ -208,6 +212,11 @@
                     <div class="modal-header">
                         <h5 class="modal-title">{{ editMode === 'add' ? '新增关键词' : '编辑关键词' }}</h5>
                         <div class="d-flex gap-2 me-4 ms-4">
+                            <!-- 启用按钮 -->
+                            <button class="btn btn-sm" :class="editEnabled ? 'btn-success' : 'btn-outline-secondary'"
+                                @click="editEnabled = !editEnabled" title="是否启用关键词">
+                                🟢 启用
+                            </button>
                             <!-- 唤醒按钮 -->
                             <button class="btn btn-sm" :class="editNeedWake ? 'btn-success' : 'btn-outline-secondary'"
                                 @click="editNeedWake = !editNeedWake" title="是否需要唤醒">
@@ -286,8 +295,8 @@
                                     @input="updateImageFromInput(resp, $event)">
                                 <div class="media-preview" v-if="resp.image.length > 0">
                                     <div v-for="(img, imgIdx) in resp.image" :key="imgIdx" class="media-item">
-                                        <img :src="'/files/' + encodeURIComponent(img)" alt="图片"
-                                            style="max-width: 100px; max-height: 100px;">
+                                        <img :src="'/files/' + encodeURIComponent(img) + (editKey ? '?keyword=' + encodeURIComponent(editKey) : '')"
+                                            alt="图片" style="max-width: 100px; max-height: 100px;">
                                         <span class="remove-media" @click="removeMedia(resp, 'image', imgIdx)">×</span>
                                     </div>
                                 </div>
@@ -299,7 +308,8 @@
                                     @input="updateVideoFromInput(resp, $event)">
                                 <div class="media-preview" v-if="resp.video.length > 0">
                                     <div v-for="(vid, vidIdx) in resp.video" :key="vidIdx" class="media-item">
-                                        <span>{{ vid }}</span>
+                                        <span class="keyword-link" @click="openVideoPreview(vid)">{{ escapeHtml(vid)
+                                            }}</span>
                                         <span class="remove-media" @click="removeMedia(resp, 'video', vidIdx)">×</span>
                                     </div>
                                 </div>
@@ -311,7 +321,7 @@
                                     @input="updateFileFromInput(resp, $event)">
                                 <div class="media-preview" v-if="resp.file.length > 0">
                                     <div v-for="(file, fileIdx) in resp.file" :key="fileIdx" class="media-item">
-                                        <span>{{ file }}</span>
+                                        <span>{{ escapeHtml(file) }}</span>
                                         <span class="remove-media" @click="removeMedia(resp, 'file', fileIdx)">×</span>
                                     </div>
                                 </div>
@@ -322,6 +332,29 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                         <button type="button" class="btn btn-primary" @click="saveKeyword">保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 视频预览模态框 -->
+        <div class="modal fade" id="videoPreviewModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">视频预览</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="embed-responsive embed-responsive-16by9">
+                            <video ref="previewVideo" controls class="w-100">
+                                <source :src="previewVideoUrl" type="video/mp4">
+                                您的浏览器不支持视频播放。
+                            </video>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
                     </div>
                 </div>
             </div>
@@ -347,7 +380,12 @@
                 const editNeedWake = ref(true);
                 const editRegexMatch = ref(false);
                 const editCronEnabled = ref(false);
+                const editEnabled = ref(true);
                 const editCronConfig = ref({ cron_expression: '', whitelist: [], blacklist: [] });
+
+                // 视频预览相关
+                const previewVideoUrl = ref('');
+                const previewVideo = ref(null);
 
                 // 主题相关
                 const isDark = ref(false);
@@ -382,7 +420,8 @@
                     localStorage.setItem('keywords_pro_theme', theme);
                 };
 
-                let bsEditModal = null;
+                const bsEditModal = ref(null);
+                const bsVideoPreviewModal = ref(null);
 
                 function normalizeResponse(resp) {
                     if (!resp) return { text: '', image: [], video: [], file: [] };
@@ -452,6 +491,22 @@
                     }
                 }
 
+                function openVideoPreview(videoName) {
+                    // 构建视频预览URL
+                    previewVideoUrl.value = '/files/' + encodeURIComponent(videoName) + (editKey.value ? '?keyword=' + encodeURIComponent(editKey.value) : '');
+                    // 显示视频预览模态框
+                    bsVideoPreviewModal.value.show();
+
+                    // 模态框显示后确保视频正确加载
+                    setTimeout(() => {
+                        if (previewVideo.value) {
+                            // 重置视频元素以确保重新加载
+                            previewVideo.value.src = previewVideoUrl.value;
+                            previewVideo.value.load();
+                        }
+                    }, 100);
+                }
+
                 async function checkAuth() {
                     try {
                         const resp = await fetch('/auth/info');
@@ -495,8 +550,9 @@
                     editNeedWake.value = true;
                     editRegexMatch.value = false;
                     editCronEnabled.value = false;
+                    editEnabled.value = true;
                     editCronConfig.value = { cron_expression: '', whitelist: [], blacklist: [] };
-                    bsEditModal.show();
+                    bsEditModal.value.show();
                 }
 
                 function editKeyword(key) {
@@ -512,8 +568,9 @@
                     editNeedWake.value = data.need_wake !== false;
                     editRegexMatch.value = data.regex_match || false;
                     editCronEnabled.value = data.cron_enabled || false;
+                    editEnabled.value = data.enabled !== false;
                     editCronConfig.value = data.cron_config || { cron_expression: '', whitelist: [], blacklist: [] };
-                    bsEditModal.show();
+                    bsEditModal.value.show();
                 }
 
                 function addResponse() {
@@ -530,12 +587,12 @@
                         alert('关键词不能为空');
                         return;
                     }
-                    const aliases = editAliases.value.split(',').map(s => s.trim()).filter(s => s);
+                    const aliases = editAliases.value.split(',').map(s => escapeHtml(s.trim())).filter(s => s);
                     const responses = editResponses.value.map(r => ({
-                        text: r.text || '',
-                        image: r.image,
-                        video: r.video,
-                        file: r.file
+                        text: escapeHtml(r.text || ''),
+                        image: r.image.map(img => escapeHtml(img)),
+                        video: r.video.map(vid => escapeHtml(vid)),
+                        file: r.file.map(file => escapeHtml(file))
                     }));
                     const data = {
                         aliases,
@@ -543,6 +600,7 @@
                         need_wake: editNeedWake.value,
                         regex_match: editRegexMatch.value,
                         cron_enabled: editCronEnabled.value,
+                        enabled: editEnabled.value,
                         cron_config: editCronConfig.value
                     };
 
@@ -566,7 +624,7 @@
                         });
                         const result = await resp.json();
                         if (result.success) {
-                            bsEditModal.hide();
+                            bsEditModal.value.hide();
                             await loadKeywords();
                         } else {
                             alert('保存失败: ' + result.error);
@@ -591,12 +649,56 @@
                     }
                 }
 
+                async function toggleEnabled(key) {
+                    try {
+                        const data = keywords.value[key];
+                        const newEnabled = !data.enabled;
+                        const payload = {
+                            data: {
+                                ...data,
+                                enabled: newEnabled,
+                                updated_at: new Date().toISOString()
+                            }
+                        };
+                        const resp = await fetch(`/api/keywords/${encodeURIComponent(key)}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await resp.json();
+                        if (result.success) {
+                            await loadKeywords();
+                        } else {
+                            alert('操作失败: ' + result.error);
+                        }
+                    } catch {
+                        alert('网络错误');
+                    }
+                }
+
                 function triggerFileUpload(idx) {
                     const inputId = 'file-input-' + idx;
                     const input = document.getElementById(inputId);
                     if (input) {
                         input.click();
                     }
+                }
+
+                // 安全相关常量
+                const executableExts = ['exe', 'dll', 'bat', 'cmd', 'ps1', 'sh', 'py', 'js', 'vbs', 'hta'];
+                const allowedExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'mp4', 'avi', 'mov', 'mkv', 'mp3', 'wav', 'ogg', 'flac', 'aac', 'doc', 'docx', 'pdf', 'txt', 'md', 'rtf', 'zip', 'rar', '7z', 'tar', 'gz', 'apk', 'ipa'];
+
+                // HTML转义函数，增强XSS保护
+                function escapeHtml(text) {
+                    if (!text) return '';
+                    const map = {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#039;'
+                    };
+                    return text.replace(/[&<>"']/g, m => map[m]);
                 }
 
                 async function handleFileSelected(event, idx) {
@@ -610,26 +712,52 @@
                     const total = files.length;
 
                     for (let file of files) {
+                        // 检查文件扩展名
+                        const ext = file.name.split('.').pop()?.toLowerCase();
+
+                        // 阻止可执行文件上传
+                        if (executableExts.includes(ext)) {
+                            alert(`${file.name} 上传失败: 不允许上传可执行文件`);
+                            completed++;
+                            if (completed === total) {
+                                uploadingMap[idx] = false;
+                            }
+                            continue;
+                        }
+
+                        // 检查是否为允许的文件类型
+                        if (!allowedExts.includes(ext)) {
+                            alert(`${file.name} 上传失败: 不支持的文件类型`);
+                            completed++;
+                            if (completed === total) {
+                                uploadingMap[idx] = false;
+                            }
+                            continue;
+                        }
+
                         const formData = new FormData();
                         formData.append('file', file);
+                        // 添加关键词参数
+                        const keyword = editKey.value.trim();
+                        if (keyword) {
+                            formData.append('keyword', keyword);
+                        }
                         try {
                             const res = await fetch('/api/upload', { method: 'POST', body: formData });
                             const data = await res.json();
                             if (data.success) {
-                                const ext = file.name.split('.').pop().toLowerCase();
-                                const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
-                                const videoExts = ['mp4', 'avi', 'mov', 'mkv'];
-                                if (imageExts.includes(ext)) {
-                                    if (!resp.image.includes(data.filename)) {
-                                        resp.image.push(data.filename);
+                                const safeFilename = escapeHtml(data.filename);
+                                if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) {
+                                    if (!resp.image.includes(safeFilename)) {
+                                        resp.image.push(safeFilename);
                                     }
-                                } else if (videoExts.includes(ext)) {
-                                    if (!resp.video.includes(data.filename)) {
-                                        resp.video.push(data.filename);
+                                } else if (['mp4', 'avi', 'mov', 'mkv'].includes(ext)) {
+                                    if (!resp.video.includes(safeFilename)) {
+                                        resp.video.push(safeFilename);
                                     }
                                 } else {
-                                    if (!resp.file.includes(data.filename)) {
-                                        resp.file.push(data.filename);
+                                    if (!resp.file.includes(safeFilename)) {
+                                        resp.file.push(safeFilename);
                                     }
                                 }
                             } else {
@@ -668,7 +796,8 @@
                 }
 
                 onMounted(() => {
-                    bsEditModal = new bootstrap.Modal(document.getElementById('editModal'));
+                    bsEditModal.value = new bootstrap.Modal(document.getElementById('editModal'));
+                    bsVideoPreviewModal.value = new bootstrap.Modal(document.getElementById('videoPreviewModal'));
                     checkAuth();
                     loadKeywords();
                     initTheme();
@@ -687,14 +816,20 @@
                     editNeedWake,
                     editRegexMatch,
                     editCronEnabled,
+                    editEnabled,
                     editCronConfig,
                     whitelistText,
                     blacklistText,
+                    previewVideoUrl,
+                    previewVideo,
+                    bsEditModal,
+                    bsVideoPreviewModal,
                     toggleTheme,
                     refreshData,
                     newKeyword,
                     editKeyword,
                     deleteKeyword,
+                    toggleEnabled,
                     addResponse,
                     removeResponse,
                     saveKeyword,
@@ -705,7 +840,9 @@
                     updateVideoFromInput,
                     updateFileFromInput,
                     removeMedia,
-                    cleanupUnusedFiles
+                    openVideoPreview,
+                    cleanupUnusedFiles,
+                    escapeHtml
                 };
             }
         });
