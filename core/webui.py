@@ -264,6 +264,16 @@ class WebServer:
                 return self._err("关键词不存在", 404)
             del self.plugin.keywords_data[key]
             self.plugin._save_keywords(self.plugin.keywords_data)
+            # 删除对应的关键词目录及其文件
+            keyword_dir = Path(self.plugin.data_dir) / key
+            if keyword_dir.exists() and keyword_dir.is_dir():
+                try:
+                    import shutil
+
+                    shutil.rmtree(keyword_dir)
+                    logger.info(f"已删除关键词目录: {keyword_dir}")
+                except Exception as e:
+                    logger.error(f"删除关键词目录失败: {e}")
             # 触发定时任务重新调度
             await self.plugin._reschedule_cron_jobs()
         return self._ok()
